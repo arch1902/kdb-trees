@@ -174,7 +174,7 @@ void insert(vector<int> &point, PageHandler &root){
 			else 
 			{
 				node.regions.push_back({point,0});
-				//cout<<"oops Overflow! "<< node.regions.size() <<endl;
+				// cout<<"oops Overflow! "<< node.regions.size() <<endl;
 				reorganize(node,root);
 			}
 		}else {
@@ -202,15 +202,22 @@ void splitPointNode(Node &node,int split_elem, Node &left, Node &right){
 	left.node_type = 0;
 	PageHandler leftPage = fh.NewPage();
 	left.page_identifier = leftPage.GetPageNum();
-	left.parent = node.page_identifier;
+	left.parent = node.parent;
 	occupancy[leftPage.GetPageNum()]=0;
 
 	right.split_dim = (split_dim + 1)%d;
 	right.node_type = 0;
 	PageHandler rightPage = fh.NewPage();
 	right.page_identifier = rightPage.GetPageNum();
-	right.parent = node.page_identifier;
+	right.parent = node.parent;
 	occupancy[rightPage.GetPageNum()]=0;
+
+	if(node.parent==-1){
+		right.parent=0;
+		left.parent=0;
+	}
+
+	// cout<<"CHeck 1 "<<node.page_identifier<<endl;
 
 	int side = -1; 
 	for(auto point : node.regions){
@@ -245,6 +252,54 @@ void splitPointNode(Node &node,int split_elem, Node &left, Node &right){
 	store(left,leftPage,0,true);
 	store(right,rightPage,0,true);
 
+
+}
+
+void splitRegionNode(Node &node, Node &left, Node &right){
+	int split_dim = node.split_dim;
+
+	cout<<"debug 1 :"<<node.regions.size()<<endl;
+
+	left.split_dim = (split_dim + 1)%d;
+	left.node_type = 1;
+	PageHandler leftPage = fh.NewPage();
+	left.page_identifier = leftPage.GetPageNum();
+	left.parent = node.parent;
+	occupancy[leftPage.GetPageNum()]=0;
+
+	right.split_dim = (split_dim + 1)%d;
+	right.node_type = 1;
+	PageHandler rightPage = fh.NewPage();
+	right.page_identifier = rightPage.GetPageNum();
+	right.parent = node.parent;
+	occupancy[rightPage.GetPageNum()]=0;
+
+	if(node.parent==-1){
+		right.parent=0;
+		left.parent=0;
+	}
+
+	auto regions = node.regions;
+	vector<pair<int,int>> temp;
+	for(int i=0;i<regions.size();i++) temp.push_back({regions[i].first[split_dim],i});
+	sort(temp.begin(),temp.end());
+	//cout<<"temp "<<temp.size()<<endl;
+
+	for(int i=0;i<(max_regions+1)/2;i++){
+		left.regions.push_back(regions[temp[i].second]);
+		char* data = fh.PageAt(regions[temp[i].second].second).GetData();
+		memcpy (&data[12], &left.page_identifier, sizeof(int));
+		occupancy[left.page_identifier]++;
+	}
+	for(int i=(max_regions+1)/2;i<max_regions+1;i++){
+		right.regions.push_back(regions[temp[i].second]);
+		char* data = fh.PageAt(regions[temp[i].second].second).GetData();
+		memcpy (&data[12], &right.page_identifier, sizeof(int));
+		occupancy[right.page_identifier]++;
+	}
+
+	store(left,leftPage,0,true);
+	store(right,rightPage,0,true);
 
 }
 
@@ -334,12 +389,35 @@ void reorganize(Node &node, PageHandler &page){
 			reorganize(parentNode,parentPage);
 		}
 	}
-	// else if(node.node_type==1 and node.parent!=-1){
+	else if(node.node_type==1 and node.parent==-1){
+		Node left,right;
+		splitRegionNode(node,left,right);
+		node.regions.clear();
+		vector<int> rl(2*d);
+		vector<int> rr(2*d);
+		int split_elem = right.regions[0].first[node.split_dim];
+		for(int j=0;j<d;j++){
+			if(j==node.split_dim){
+				rl[j+d] = split_elem;
+				rl[j] = node.regions[0].first[j];
+				rr[j] = split_elem;
+				rr[j+d] = node.regions[0].first[j+d];
+			}else {
+				rl[j+d] = node.regions[0].first[j+d];
+				rl[j] = node.regions[0].first[j];
+				rr[j] = node.regions[0].first[j];
+				rr[j+d] = node.regions[0].first[j+d];
+			}
+		}
+		node.regions.push_back({rl,left.page_identifier});
+		node.regions.push_back({rl,right.page_identifier});
+		occupancy[node.page_identifier] = 2;
+		store(node,page,0,true);
+	}
+	else{
+		// do this
 
-	// }
-	// else{
-
-	// }
+	}
 }
 
 // void nodeSplit(node Node){
@@ -348,6 +426,7 @@ void reorganize(Node &node, PageHandler &page){
 
 int pquery(vector<int>& point, PageHandler &page, int depth=0){
 	struct Node node = load(page);
+	cout<<node.regions.size()<<endl;
 	if(node.node_type==0){
 		//  for(auto p: node.regions)
 		// 	cout<<p.first[0]<<" "<<p.first[1]<<endl;
@@ -371,9 +450,11 @@ int pquery(vector<int>& point, PageHandler &page, int depth=0){
 		return 0;
 
 	}else {
+
 		for(auto region : node.regions){
 			bool flag = true;
 			for(int i=0;i<d;i++){
+				//cout<<region.first[i]<<" "<<region.first[d+i]<<endl;
 				if(region.first[i]>point[i] or region.first[d+i]<=point[i]){
 					flag = false;
 					break;
@@ -479,7 +560,9 @@ int main(int argc, char* argv[]) {
 	vector<int> p7 = {6,3};
 	vector<int> p8 = {10,11};
 	vector<int> p9 = {12,11};
-	vector<int> p10 = {5,10};
+	vector<int> p10 = {15,10};
+	vector<int> p11 = {13,12};
+	vector<int> p12 = {15,14};
 	vector<int> rmin = {100,1};
 	vector<int> rmax = {11,20};
 
@@ -493,20 +576,29 @@ int main(int argc, char* argv[]) {
 	insert(p7,root);
 	insert(p8,root);
 	insert(p9,root);
+	insert(p10,root);
+	insert(p11,root);
+	cout<<"---------------------------------"<<endl;
+	// insert(p12,root);
 
 
 	pquery(p1,root);
 	pquery(p2,root);
-	pquery(p3,root);
 	pquery(p4,root);
+
+
 	pquery(p5,root);
 	pquery(p6,root);
 	pquery(p7,root);
+
+	pquery(p3,root);
 	pquery(p8,root);
 	pquery(p9,root);
 	pquery(p10,root);
+	pquery(p11,root);
+	pquery(p12,root);
 
-	rquery(rmin,rmax,root,fsout);
+	//rquery(rmin,rmax,root,fsout);
 
 	
 
