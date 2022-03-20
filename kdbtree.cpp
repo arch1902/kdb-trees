@@ -153,18 +153,26 @@ void insert(vector<int> &point, PageHandler &root){
 		node.regions.push_back({point,0});
 		occupancy[root.GetPageNum()]+=1;
 		int offset = store(node,root,0,true);
+		cout<<"INSERTION DONE:"<<endl;
+		for(auto x:point) cout<<x<<" ";
+		cout<<endl<<endl<<endl;
 
 	}else {
 		struct Node node = load(root);
 		if(node.node_type==0){
 			if(occupancy[root.GetPageNum()]<max_points){
+				node.regions.push_back({point,0});
 				int t = addPoint(point,root,occupancy[root.GetPageNum()]*point_size + 16);
 				//cout<<"Added "<<point[0]<<" "<<point[1]<<" at "<<t<<endl;
-
+				cout<<"INSERTION DONE:"<<endl;
+				for(auto point: node.regions){
+					for(auto x:point.first) cout<<x<<" ";
+					cout<<endl;
+				}
+				cout<<endl<<endl;
 			}
 			else 
 			{
-				
 				node.regions.push_back({point,0});
 				//cout<<"oops Overflow! "<< node.regions.size() <<endl;
 				reorganize(node,root);
@@ -204,17 +212,34 @@ void splitPointNode(Node &node,int split_elem, Node &left, Node &right){
 	right.parent = node.page_identifier;
 	occupancy[rightPage.GetPageNum()]=0;
 
-
+	int side = -1; 
 	for(auto point : node.regions){
 		if(point.first[split_dim]<split_elem){
 			left.regions.push_back(point);
 			occupancy[leftPage.GetPageNum()]++;
+			if(point==node.regions.back()) side=0;
 			//cout<<"Left Inserted: "<<point.first[0]<<" "<<point.first[1]<<endl;
 		}else {
 			right.regions.push_back(point);
 			occupancy[rightPage.GetPageNum()]++;
+			if(point==node.regions.back()) side=1;
 			//cout<<"Right Inserted: "<<point.first[0]<<" "<<point.first[1]<<endl;
 		}
+	}
+	cout<<"INSERTION DONE:"<<endl;
+	vector<int> v;
+	if(side==0){
+		for(auto point: left.regions){
+			for(auto x:point.first) cout<<x<<" ";
+			cout<<endl;
+		}
+		cout<<endl<<endl;
+	}else {
+		for(auto point: right.regions){
+			for(auto x:point.first) cout<<x<<" ";
+			cout<<endl;
+		}
+		cout<<endl<<endl;
 	}
 
 	store(left,leftPage,0,true);
@@ -321,7 +346,7 @@ void reorganize(Node &node, PageHandler &page){
 
 // }
 
-int pquery(vector<int>& point, PageHandler &page){
+int pquery(vector<int>& point, PageHandler &page, int depth=0){
 	struct Node node = load(page);
 	if(node.node_type==0){
 		//  for(auto p: node.regions)
@@ -335,9 +360,16 @@ int pquery(vector<int>& point, PageHandler &page){
 				}
 			}
 			//cout<<"Flag = "<<flag<<endl;
-			if(flag) return flag;
+			if(flag) {
+				cout<<"NUM REGION NODES TOUCHED: "<<depth<<endl;
+				cout<<"TRUE"<<endl<<endl<<endl;
+				return flag;
+			}
 		}
+		cout<<"NUM REGION NODES TOUCHED: "<<0<<endl;
+		cout<<"FALSE"<<endl<<endl<<endl;
 		return 0;
+
 	}else {
 		for(auto region : node.regions){
 			bool flag = true;
@@ -350,7 +382,7 @@ int pquery(vector<int>& point, PageHandler &page){
 			if(flag) {
 				PageHandler temp = fh.PageAt(region.second);
 				//cout<<"Region chosen:"<<region.second<<endl;
-				return pquery(point,temp);
+				return pquery(point,temp,depth+1);
 			}
 		}
 	}
@@ -362,11 +394,11 @@ void rquery(vector<int> point_min, vector<int> point_max, PageHandler &root, fst
 	if(occupancy[root.GetPageNum()]==0){
 		fsout<<"NO POINT FOUND"<<endl;
 	}
-	queue<int> q;
-	q.push(root.GetPageNum());
+	queue<pair<int,int>> q;
+	q.push({root.GetPageNum(),0});
 	while(!q.empty()){
-		PageHandler currPage = fh.PageAt(q.front());
-		cout<<q.front()<<endl;
+		PageHandler currPage = fh.PageAt(q.front().first);
+		int depth = q.front().second;
 		q.pop();
 		Node node = load(currPage);
 		if(node.node_type==0){
@@ -378,6 +410,7 @@ void rquery(vector<int> point_min, vector<int> point_max, PageHandler &root, fst
 						break;
 					}
 				}
+				point.first.push_back(depth);
 				if(flag) result.push_back(point.first);
 			}
 		}else {
@@ -389,15 +422,22 @@ void rquery(vector<int> point_min, vector<int> point_max, PageHandler &root, fst
 						break;
 					}
 				}
-				if(flag) q.push(region.second);
+				if(flag) q.push({region.second,depth+1});
 			}
 		}
 	}
+	if(result.size()==0){
+		cout<<"NO POINT FOUND"<<endl<<endl<<endl;
+		return;
+	}
+
 	for(int i=0;i<result.size();i++){
 		cout<<"POINT: ";
 		for(int j=0;j<d;j++) cout<<result[i][j]<<" ";
+		cout<<"NUM REGION NODES TOUCHED: "<<result[i][d];
 		cout<<endl;
 	}
+	cout<<endl<<endl;
 }
 
 
@@ -439,7 +479,8 @@ int main(int argc, char* argv[]) {
 	vector<int> p7 = {6,3};
 	vector<int> p8 = {10,11};
 	vector<int> p9 = {12,11};
-	vector<int> rmin = {3,1};
+	vector<int> p10 = {5,10};
+	vector<int> rmin = {100,1};
 	vector<int> rmax = {11,20};
 
 
@@ -454,15 +495,16 @@ int main(int argc, char* argv[]) {
 	insert(p9,root);
 
 
-	cout<< pquery(p1,root)<<endl;
-	cout<< pquery(p2,root)<<endl;
-	cout<< pquery(p3,root)<<endl;
-	cout<< pquery(p4,root)<<endl;
-	cout<< pquery(p5,root)<<endl;
-	cout<< pquery(p6,root)<<endl;
-	cout<< pquery(p7,root)<<endl;
-	cout<< pquery(p8,root)<<endl;
-	cout<< pquery(p9,root)<<endl;
+	pquery(p1,root);
+	pquery(p2,root);
+	pquery(p3,root);
+	pquery(p4,root);
+	pquery(p5,root);
+	pquery(p6,root);
+	pquery(p7,root);
+	pquery(p8,root);
+	pquery(p9,root);
+	pquery(p10,root);
 
 	rquery(rmin,rmax,root,fsout);
 
@@ -514,6 +556,5 @@ int main(int argc, char* argv[]) {
 
 	fm.CloseFile (fh);
 	fm.DestroyFile ("temp.txt");
-
 
 }
