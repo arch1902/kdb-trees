@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <queue>
+#include <sstream>
+
 using namespace std;
 
 int INF = 1000000000;
@@ -76,6 +78,7 @@ int store(struct Node node, PageHandler &page, int offset, bool flag){
 			offset+=4;
 		}
 	}
+	fh.MarkDirty(node.page_identifier);
 	return offset;
 }
 
@@ -91,6 +94,7 @@ int addPoint(vector<int> &point, PageHandler &page, int offset){
 	int id;
 	memcpy (&id, &data[0], sizeof(int));
 	occupancy[id]++;
+	fh.MarkDirty(id);
 	return offset;
 }
 
@@ -252,13 +256,12 @@ void splitPointNode(Node &node,int split_elem, Node &left, Node &right){
 	store(left,leftPage,0,true);
 	store(right,rightPage,0,true);
 
-
 }
 
 void splitRegionNode(Node &node, Node &left, Node &right){
 	int split_dim = node.split_dim;
 
-	cout<<"debug 1 :"<<node.regions.size()<<endl;
+	//cout<<"debug 1 :"<<node.regions.size()<<endl;
 
 	left.split_dim = (split_dim + 1)%d;
 	left.node_type = 1;
@@ -287,14 +290,20 @@ void splitRegionNode(Node &node, Node &left, Node &right){
 
 	for(int i=0;i<(max_regions+1)/2;i++){
 		left.regions.push_back(regions[temp[i].second]);
+		//cout<<"OK "<<regions[temp[i].second].first[0]<<" "<<regions[temp[i].second].first[2]<<endl;
+		//cout<<"OK "<<regions[temp[i].second].first[1]<<" "<<regions[temp[i].second].first[3]<<endl;
 		char* data = fh.PageAt(regions[temp[i].second].second).GetData();
 		memcpy (&data[12], &left.page_identifier, sizeof(int));
+		fh.MarkDirty(left.page_identifier);
 		occupancy[left.page_identifier]++;
 	}
 	for(int i=(max_regions+1)/2;i<max_regions+1;i++){
 		right.regions.push_back(regions[temp[i].second]);
+		//cout<<"OK "<<regions[temp[i].second].first[0]<<" "<<regions[temp[i].second].first[2]<<endl;
+		//cout<<"OK "<<regions[temp[i].second].first[1]<<" "<<regions[temp[i].second].first[3]<<endl;
 		char* data = fh.PageAt(regions[temp[i].second].second).GetData();
 		memcpy (&data[12], &right.page_identifier, sizeof(int));
+		fh.MarkDirty(right.page_identifier);
 		occupancy[right.page_identifier]++;
 	}
 
@@ -323,6 +332,8 @@ void reorganize(Node &node, PageHandler &page){
 		vector<int> rl(2*d);
 		vector<int> rr(2*d);
 
+		//cout<<"siuuuuuuuuuuuuuuuuuu"<<split_elem<<endl;
+
 		for(int i=0;i<d;i++){
 			if(i==split_dim){
 				rl[i] = -INF;
@@ -349,8 +360,10 @@ void reorganize(Node &node, PageHandler &page){
 		vector<int> v;
 		for(auto point : node.regions){
 			v.push_back(point.first[split_dim]);
+			//cout<<point.first[split_dim]<<endl;
 		}
 		int split_elem = median(v);
+		//cout<<"siuuuuuuuuu"<<split_elem<<endl;
 		Node left,right;
 
 		splitPointNode(node,split_elem,left,right);
@@ -362,6 +375,8 @@ void reorganize(Node &node, PageHandler &page){
 			if(parentNode.regions[i].second==node.page_identifier){
 				vector<int> rl(2*d);
 				vector<int> rr(2*d);
+
+				
 				for(int j=0;j<d;j++){
 					if(j==split_dim){
 						rl[j+d] = split_elem;
@@ -426,7 +441,7 @@ void reorganize(Node &node, PageHandler &page){
 
 int pquery(vector<int>& point, PageHandler &page, int depth=0){
 	struct Node node = load(page);
-	cout<<node.regions.size()<<endl;
+	//cout<<node.regions.size()<<endl;
 	if(node.node_type==0){
 		//  for(auto p: node.regions)
 		// 	cout<<p.first[0]<<" "<<p.first[1]<<endl;
@@ -454,7 +469,7 @@ int pquery(vector<int>& point, PageHandler &page, int depth=0){
 		for(auto region : node.regions){
 			bool flag = true;
 			for(int i=0;i<d;i++){
-				//cout<<region.first[i]<<" "<<region.first[d+i]<<endl;
+				// cout<<region.first[i]<<" "<<region.first[d+i]<<endl;
 				if(region.first[i]>point[i] or region.first[d+i]<=point[i]){
 					flag = false;
 					break;
@@ -542,8 +557,8 @@ int main(int argc, char* argv[]) {
 	max_regions = temp/region_size;
 	num_pages = 0;
 
-	cout<<"Max points:"<<max_points<<endl;
-	cout<<"Max regions:"<<max_regions<<endl;
+	// cout<<"Max points:"<<max_points<<endl;
+	// cout<<"Max regions:"<<max_regions<<endl;
 
 	
 	fh = fm.CreateFile("temp.txt");
@@ -551,100 +566,50 @@ int main(int argc, char* argv[]) {
 	occupancy[root.GetPageNum()] = 0;
 	
 
-	vector<int> p1 = {2,3};
-	vector<int> p2 = {5,4};
-	vector<int> p3 = {9,6};
-	vector<int> p4 = {4,7};
-	vector<int> p5 = {8,1};
-	vector<int> p6 = {7,2};
-	vector<int> p7 = {6,3};
-	vector<int> p8 = {10,11};
-	vector<int> p9 = {12,11};
-	vector<int> p10 = {15,10};
-	vector<int> p11 = {13,12};
-	vector<int> p12 = {15,14};
-	vector<int> rmin = {100,1};
-	vector<int> rmax = {11,20};
 
+	if (fsin.is_open()){ 
+		string tp;
+		while(getline(fsin, tp)){
+			cout << tp << "\n";
 
-	insert(p1,root);
-	insert(p2,root);
-	insert(p3,root);
-	insert(p4,root);
-	insert(p5,root);
-	insert(p6,root);
-	insert(p7,root);
-	insert(p8,root);
-	insert(p9,root);
-	insert(p10,root);
-	insert(p11,root);
-	cout<<"---------------------------------"<<endl;
-	// insert(p12,root);
+			stringstream ss(tp);
+    		string word;
+			vector<string> temp;
+    		while (ss >> word) 
+    		{
+        		temp.push_back(word);
+    		}
 
+			if(tp[0]=='I'){ 		//INSERT
+				vector<int> point;
+				for(int i=0;i<d;i++){
+					point.push_back(stoi(temp[i+1]));
+				}
+				insert(point,root);
 
-	pquery(p1,root);
-	pquery(p2,root);
-	pquery(p4,root);
-
-
-	pquery(p5,root);
-	pquery(p6,root);
-	pquery(p7,root);
-
-	pquery(p3,root);
-	pquery(p8,root);
-	pquery(p9,root);
-	pquery(p10,root);
-	pquery(p11,root);
-	pquery(p12,root);
-
-	//rquery(rmin,rmax,root,fsout);
-
-	
-
-	// if (fsin.is_open()){ 
-	// 	string tp;
-	// 	while(getline(fsin, tp)){
-	// 		cout << tp << "\n";
-
-	// 		istringstream ss(tp);
-    // 		string word;
-	// 		vector<string> temp;
-    // 		while (ss >> word) 
-    // 		{
-    //     		temp.push_back(word);
-    // 		}
-
-	// 		if(tp[0]=='I'){ 		//INSERT
-	// 			vector<int> point;
-	// 			for(int i=0;i<d;i++){
-	// 				point.push_back(stoi(temp[i+1]));
-	// 			}
-
-	// 			// Call insert
-
-	// 		}
-	// 		else if(tp[0]=='P'){	//PQUERY
-	// 			vector<int> point;
-	// 			for(int i=0;i<d;i++){
-	// 				point.push_back(stoi(temp[i+1]));
-	// 			}
-
-	// 			// Call pquery
-	// 		}
-	// 		else{					//RQUERY
-	// 			vector<int> point_min,point_max;
-	// 			for(int i=0;i<2*d;i+=2){
-	// 				point_min.push_back(stoi(temp[i+1]));
-	// 				point_max.push_back(stoi(temp[i+2]));
-	// 			}
-
-	// 			// Call rquery
-	// 		}
-	// 	}
-	// 	fsin.close();
-	// 	fsout.close();
-   	// }
+			}
+			else if(tp[0]=='P'){	//PQUERY
+				vector<int> point;
+				for(int i=0;i<d;i++){
+					point.push_back(stoi(temp[i+1]));
+				}
+				pquery(point,root);
+			}
+			else{					//RQUERY
+				vector<int> point_min,point_max;
+				for(int i=0;i<2*d;i+=2){
+					point_min.push_back(stoi(temp[i+1]));
+					point_max.push_back(stoi(temp[i+2]));
+				}
+				rquery(point_min,point_max,root,fsout);
+			}
+			
+			fm.PrintBuffer();
+			fh.FlushPages();
+		}
+		fsin.close();
+		fsout.close();
+   	}
 
 	fm.CloseFile (fh);
 	fm.DestroyFile ("temp.txt");
